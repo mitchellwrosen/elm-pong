@@ -15,4 +15,4 @@ input = sampleOn delta (Input <~ Keyboard.space
                                ~ delta)
 
 delta : Signal Time
-delta = inSeconds <~ fps 35
+delta = inSeconds <~ fps 50

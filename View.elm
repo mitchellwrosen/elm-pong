@@ -3,28 +3,28 @@ module View where
 import open Import
 import open Model
 
-pongGreen : Color
-pongGreen = rgb 60 100 60
-
-textGreen : Color
-textGreen = rgb 160 200 160
-
 display : (Int,Int) -> Game -> Element
-display (w,h) {width,height,state,ball,playerL,playerR} =
-  let scores : Element
-      scores = txt (Text.height 50) (show playerL.score ++ "  " ++ show playerR.score)
-  in container w h middle $ collage width height
-       [ boardf width height
-       , ballf ball
-       , paddlef playerL.paddle
-       , paddlef playerR.paddle
-       , toForm scores & move (0, (toFloat height)/2 - 40)
-       , toForm (if state == Play then spacer 1 1 else txt id msg)
-           & move (0, 40 - (toFloat height)/2)
-       ]
+display (windowWidth, windowHeight) {state,ball,playerL,playerR} =
+    container windowWidth windowHeight middle $
+        collage gameWidth gameHeight
+            [ boardf
+            , midlinef
+            , ballf ball
+            , paddlef playerL.paddle
+            , paddlef playerR.paddle
+            , scoresf playerL.score playerR.score 
+            , infof state
+            ]
 
-boardf : Int -> Int -> Form
-boardf width height = rect (toFloat width) (toFloat height) & filled pongGreen
+midlinef : Form
+midlinef = let midline = dashed black in 
+   segment (0, -halfHeight) (0,halfHeight)
+      & traced { midline | width <- 5 }
+
+
+boardf : Form
+boardf = rect (toFloat gameWidth) (toFloat gameHeight) 
+   & filled (rgb 60 100 60)
 
 ballf : Ball -> Form
 ballf ball = oval 15 15
@@ -36,8 +36,16 @@ paddlef paddle = rect 10 40
    & filled white
    & move (paddle.x, paddle.y)
 
-txt : (Text -> Text) -> String -> Element
-txt f = text . f . monospace . Text.color textGreen . toText
+scoresf : Int -> Int -> Form
+scoresf scoreL scoreR = textf (Text.height 50) (show scoreL ++ "  " ++ show scoreR)
+   & move (0, toFloat gameHeight / 2 - 40)
 
-msg : String
-msg = "SPACE to start, WS and &uarr;&darr; to move"
+infof : State -> Form
+infof state = 
+   if state == Play 
+      then toForm (spacer 1 1) 
+      else textf id "SPACE to start, WS and &uarr;&darr; to move"
+   & move (0, 40 - toFloat gameHeight / 2)
+
+textf : (Text -> Text) -> String -> Form
+textf f = toForm . text . f . monospace . Text.color (rgb 60 200 160) . toText

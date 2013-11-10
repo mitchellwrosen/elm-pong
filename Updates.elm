@@ -1,49 +1,51 @@
-module Updates where
+module Updates (step) where
 
-import open Model
 import open Input
+import open Model
+
+step : Input -> Game -> Game
+step {space,dirL,dirR,delta} ({state,ball,playerL,playerR} as game) =
+  let scoreL = if ball.x >  halfWidth then 1 else 0
+      scoreR = if ball.x < -halfWidth then 1 else 0
+  in  { game | state   <- stepState space scoreL scoreR state
+             , ball    <- stepBall state delta ball playerL.paddle playerR.paddle
+             , playerL <- stepPlayer delta dirL scoreL playerL
+             , playerR <- stepPlayer delta dirR scoreR playerR }
+
+stepState : Bool -> Int -> Int -> State -> State
+stepState space scoreL scoreR state =
+   if | space            -> Play
+      | scoreL /= scoreR -> Pause
+      | otherwise        -> state
+
+stepBall : State -> Time -> Ball -> Paddle -> Paddle -> Ball
+stepBall state t ({x,y,vx,vy} as ball) paddleL paddleR =
+    if | state == Pause                -> ball
+       | not (near 0 halfWidth ball.x) -> { ball | x <- 0, y <- 0 }
+       | otherwise                     ->
+           stepObj t { ball | vx <- stepVelocity vx (ball `within` paddleL) (ball `within` paddleR)
+                            , vy <- stepVelocity vy (y < 7-halfHeight) (y > halfHeight-7) }
+
+stepPlayer : Time -> Int -> Int -> Player -> Player
+stepPlayer t dir points player =
+  { player | paddle <- stepPaddle t dir player.paddle
+           , score  <- player.score + points }
+
+stepPaddle : Time -> Int -> Paddle -> Paddle
+stepPaddle t dir paddle =
+   let paddle' = stepObj t { paddle | vy <- toFloat dir * 200 }
+   in  { paddle' | y <- clamp (22-halfHeight) (halfHeight-22) paddle'.y }
 
 stepObj t ({x,y,vx,vy} as obj) =
     { obj | x <- x + vx*t
           , y <- y + vy*t }
 
 near : number -> number -> number -> Bool
-near k c n = n >= k-c && n <= k+c
+near bullseye radius dart = abs (dart-bullseye) <= radius
 
-within ball paddle = near paddle.x 8  ball.x && 
-                     near paddle.y 20 ball.y
+within ball paddle = near paddle.x 8 ball.x && near paddle.y 20 ball.y
 
-stepV v lowerCollision upperCollision =
+stepVelocity v lowerCollision upperCollision =
   if | lowerCollision -> abs v
      | upperCollision -> 0 - abs v
      | otherwise      -> v
-
-stepBall : Time -> Ball -> Player -> Player -> Ball
-stepBall t ({x,y,vx,vy} as ball) p1 p2 =
-  if not (near 0 halfWidth ball.x)
-  then { ball | x <- 0, y <- 0 }
-  else stepObj t { ball | vx <- stepV vx (ball `within` p1.paddle) (ball `within` p2.paddle) ,
-                          vy <- stepV vy (y < 7-halfHeight) (y > halfHeight-7) }
-
-stepPlyr : Time -> Int -> Int -> Player -> Player
-stepPlyr t dir points player =
-  { player | paddle <- stepPaddle t dir player.paddle
-           , score  <- player.score + points }
-
-stepPaddle : Time -> Int -> Paddle -> Paddle
-stepPaddle t dir paddle =
-   let paddle1 = stepObj t { paddle | vy <- toFloat dir * 200 }
-   in  { paddle1 | y <- clamp (22-halfHeight) (halfHeight-22) paddle1.y }
-
-step : Input -> Game -> Game
-step {space,dirL,dirR,delta} ({state,ball,playerL,playerR} as game) =
-  let scoreL : Int
-      scoreL = if ball.x >  halfWidth then 1 else 0
-      scoreR = if ball.x < -halfWidth then 1 else 0
-  in  {game| state   <- if | space            -> Play
-                           | scoreL /= scoreR -> Pause
-                           | otherwise        -> state
-           , ball    <- if state == Pause then ball else
-                            stepBall delta ball playerL playerR
-           , playerL <- stepPlyr delta dirL scoreL playerL
-           , playerR <- stepPlyr delta dirR scoreR playerR }
